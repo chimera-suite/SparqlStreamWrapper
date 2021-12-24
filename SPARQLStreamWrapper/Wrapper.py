@@ -751,8 +751,12 @@ class SPARQLWrapper(object):
         try:
             if self.timeout:
                 response = urlopener(request, timeout=self.timeout)
+                while True:
+                    yield response.readline(),self.returnFormat
             else:
                 response = urlopener(request)
+                while True:
+                    yield response.readline(),self.returnFormat
             return response, self.returnFormat
         except urllib.error.HTTPError as e:
             if e.code == 400:
@@ -786,7 +790,9 @@ class SPARQLWrapper(object):
             :return: query result
             :rtype: :class:`QueryResult` instance
         """
-        return QueryResult(self._query())
+        #for res in self.query():
+        #    yield QueryResult(res)
+        return self._query()
 
     def queryAndConvert(self):
         """Macro like method: issue a query and return the converted results.

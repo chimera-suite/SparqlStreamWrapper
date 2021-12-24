@@ -22,7 +22,7 @@ SPARQL Wrapper exceptions
 """
 
 
-class SPARQLWrapperException(Exception):
+class SPARQLStreamWrapperException(Exception):
     """
     Base class for SPARQL Wrapper exceptions
     """
@@ -38,10 +38,10 @@ class SPARQLWrapperException(Exception):
         else:
             formatted_msg = "%s: %s." % (self.__class__.__name__, self.msg)
 
-        super(SPARQLWrapperException, self).__init__(formatted_msg)
+        super(SPARQLStreamWrapperException, self).__init__(formatted_msg)
 
 
-class EndPointInternalError(SPARQLWrapperException):
+class EndPointInternalError(SPARQLStreamWrapperException):
     """
     Exception type for Internal Server Error responses. Usually HTTP response status code ``500``.
     """
@@ -49,7 +49,7 @@ class EndPointInternalError(SPARQLWrapperException):
     msg = "endpoint returned code 500 and response"
 
 
-class QueryBadFormed(SPARQLWrapperException):
+class QueryBadFormed(SPARQLStreamWrapperException):
     """
     Query Bad Formed exception. Usually HTTP response status code ``400``.
     """
@@ -57,7 +57,7 @@ class QueryBadFormed(SPARQLWrapperException):
     msg = "a bad request has been sent to the endpoint, probably the sparql query is bad formed"
 
 
-class EndPointNotFound(SPARQLWrapperException):
+class EndPointNotFound(SPARQLStreamWrapperException):
     """
     End Point Not Found exception. Usually HTTP response status code ``404``.
     """
@@ -65,7 +65,7 @@ class EndPointNotFound(SPARQLWrapperException):
     msg = "it was impossible to connect with the endpoint in that address, check if it is correct"
 
 
-class Unauthorized(SPARQLWrapperException):
+class Unauthorized(SPARQLStreamWrapperException):
     """
     Access is denied due to invalid credentials (unauthorized). Usually HTTP response status code ``401``.
 
@@ -75,7 +75,7 @@ class Unauthorized(SPARQLWrapperException):
     msg = "access is denied due to invalid credentials (unauthorized). Check the credentials"
 
 
-class URITooLong(SPARQLWrapperException):
+class URITooLong(SPARQLStreamWrapperException):
     """
     The URI requested by the client is longer than the server is willing to interpret. Usually HTTP response status code ``414``.
 

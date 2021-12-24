@@ -310,12 +310,14 @@ class SPARQLWrapper2(SPARQLWrapper.SPARQLWrapper):
             :return: query result
             :rtype: :class:`Bindings` instance
         """
-        res = super(SPARQLWrapper2, self).query()
 
-        if self.queryType == SELECT:
-            return Bindings(res)
-        else:
-            return res
+        while True:
+            res = super(SPARQLWrapper2, self).query()
+
+            if self.queryType == SELECT:
+                yield Bindings(res)
+            else:
+                yield res
 
     def queryAndConvert(self):
         """This is here to override the inherited method; it is equivalent to :class:`query`.
