@@ -30,7 +30,7 @@ __date__ = "2019-04-18"
 __agent__ = "sparqlwrapper %s (rdflib.github.io/sparqlwrapper)" % __version__
 
 
-from .Wrapper import SPARQLWrapper
+from .Wrapper import SPARQLStreamWrapper
 from .Wrapper import XML, JSON, TURTLE, N3, JSONLD, RDF, RDFXML, CSV, TSV
 from .Wrapper import GET, POST
 from .Wrapper import SELECT, CONSTRUCT, ASK, DESCRIBE, INSERT, DELETE
