@@ -33,7 +33,7 @@ import warnings
 import json
 from .KeyCaseInsensitiveDict import KeyCaseInsensitiveDict
 from .SPARQLExceptions import QueryBadFormed, EndPointNotFound, EndPointInternalError, Unauthorized, URITooLong
-from SPARQLWrapper import __agent__
+from SPARQLStreamWrapper import __agent__
 
 # alias
 
@@ -150,7 +150,7 @@ _returnFormatSetting = ["format", "output", "results"]
 #######################################################################################################
 
 
-class SPARQLWrapper(object):
+class SPARQLStreamWrapper(object):
     """
     Wrapper around an online access to a SPARQL Web entry point.
 
