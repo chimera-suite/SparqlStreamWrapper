@@ -24,7 +24,7 @@ SPARQL Wrapper exceptions
 
 class SPARQLStreamWrapperException(Exception):
     """
-    Base class for SPARQL Wrapper exceptions
+    Base class for SPARQLStreamWrapper exceptions
     """
 
     msg = "an exception has occurred"

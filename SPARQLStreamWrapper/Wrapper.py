@@ -43,6 +43,8 @@ JSON   = "json"
 """to be used to set the return format to ``JSON``."""
 JSONLD = "json-ld"
 """to be used to set the return format to ``JSON-LD``."""
+JSONL = "jsonl"
+"""to be used to set the return format to ``JSONLines``."""
 TURTLE = "turtle"
 """to be used to set the return format to ``Turtle``."""
 N3     = "n3"
@@ -55,7 +57,7 @@ CSV    = "csv"
 """to be used to set the return format to ``CSV``"""
 TSV    = "tsv"
 """to be used to set the return format to ``TSV``"""
-_allowedFormats = [JSON, XML, TURTLE, N3, RDF, RDFXML, CSV, TSV]
+_allowedFormats = [JSON, XML, TURTLE, N3, RDF, RDFXML, CSV, TSV, JSONL]
 
 # Possible HTTP methods
 GET = "GET"
@@ -119,6 +121,7 @@ _REQUEST_METHODS = [URLENCODED, POSTDIRECTLY]
 _SPARQL_DEFAULT  = ["application/sparql-results+xml", "application/rdf+xml", "*/*"]
 _SPARQL_XML      = ["application/sparql-results+xml"]
 _SPARQL_JSON     = ["application/sparql-results+json", "application/json", "text/javascript", "application/javascript"] # VIVO server returns "application/javascript"
+_SPARQL_JSONL    = [ "application/sparql-results+jsonl" ]
 _RDF_XML         = ["application/rdf+xml"]
 _RDF_TURTLE      = ["application/turtle", "text/turtle"]
 _RDF_N3          = _RDF_TURTLE + ["text/rdf+n3", "application/n-triples", "application/n3", "text/n3"]
@@ -641,6 +644,8 @@ class SPARQLStreamWrapper(object):
                 acceptHeader = ",".join(_SPARQL_XML)
             elif self.returnFormat == JSON:
                 acceptHeader = ",".join(_SPARQL_JSON)
+            elif self.returnFormat == JSONL:
+                acceptHeader = ",".join(_SPARQL_JSONL)
             elif self.returnFormat == CSV:  # Allowed for SELECT and ASK (https://www.w3.org/TR/2013/REC-sparql11-protocol-20130321/#query-success) but only described for SELECT (https://www.w3.org/TR/sparql11-results-csv-tsv/)
                 acceptHeader = ",".join(_CSV)
             elif self.returnFormat == TSV:  # Allowed for SELECT and ASK (https://www.w3.org/TR/2013/REC-sparql11-protocol-20130321/#query-success) but only described for SELECT (https://www.w3.org/TR/sparql11-results-csv-tsv/)
@@ -665,6 +670,8 @@ class SPARQLStreamWrapper(object):
                 acceptHeader = ",".join(_SPARQL_XML)
             elif self.returnFormat == JSON:
                 acceptHeader = ",".join(_SPARQL_JSON)
+            elif self.returnFormat == JSONL:
+                acceptHeader = ",".join(_SPARQL_JSONL)
             else:
                 acceptHeader = ",".join(_ALL)
         else:
@@ -735,7 +742,7 @@ class SPARQLStreamWrapper(object):
 
         return request
 
-    def _query(self):
+    def _query(self,skipHeader=False):
         """Internal method to execute the query. Returns the output of the
         :func:`urllib2.urlopen` method of the :mod:`urllib2` Python library
 
@@ -752,29 +759,21 @@ class SPARQLStreamWrapper(object):
         try:
             if self.timeout:
                 response = urlopener(request, timeout=self.timeout)
-                self.queryRequest = response
-                if self.returnFormat == CSV or self.returnFormat == TSV:
-                    yield response.readline(),self.returnFormat
-                    yield response.readline(),self.returnFormat
-                    while True:
-                        response.readline(),self.returnFormat #SKIP repeated headers
-                        yield response.readline(),self.returnFormat
-                else:
-                    while True:
-                        yield response.readline(),self.returnFormat
             else:
                 response = urlopener(request)
-                self.queryRequest = response
-                if self.returnFormat == CSV or self.returnFormat == TSV:
+            self.queryRequest = response
+            if self.returnFormat == CSV or self.returnFormat == TSV:
+                if skipHeader == False:
                     yield response.readline(),self.returnFormat
-                    yield response.readline(),self.returnFormat
-                    while True:
-                        response.readline(),self.returnFormat #SKIP repeated headers
-                        yield response.readline(),self.returnFormat
                 else:
-                    while True:
-                        yield response.readline(),self.returnFormat
-            return
+                    response.readline() #SKIP  first header
+                yield response.readline(),self.returnFormat
+                while True:
+                    response.readline() #SKIP repeated headers
+                    yield response.readline(),self.returnFormat
+            else:
+                while True:
+                    yield response.readline(),self.returnFormat
         except urllib.error.HTTPError as e:
             if e.code == 400:
                 raise QueryBadFormed(e.read())
@@ -789,7 +788,7 @@ class SPARQLStreamWrapper(object):
             else:
                 raise e
 
-    def query(self):
+    def query(self, skipHeader=False):
         """
             Execute the query.
             Exceptions can be raised if either the URI is wrong or the HTTP sends back an error (this is also the
@@ -807,9 +806,9 @@ class SPARQLStreamWrapper(object):
             :return: query result
             :rtype: :class:`QueryResult` instance
         """
-        #for res in self.query():
-        #    yield QueryResult(res)
-        return self._query()
+        for res in self._query():
+            yield QueryResult(res)
+        #return self._query(skipHeader)
     
     def endQuery(self):
         self.queryRequest.close()
@@ -889,288 +888,8 @@ class QueryResult(object):
         """
         return KeyCaseInsensitiveDict(self.response.info())
 
-    def __iter__(self):
-        """Return an iterator object. This method is expected for the inclusion
-        of the object in a standard ``for`` loop.
-        """
-        return self.response.__iter__()
+    def getRawResponse(self):
+        return self.response
 
-    def __next__(self):
-        """Method for the standard iterator."""
-        return next(self.response)
-
-    def _convertJSON(self):
-        """
-        Convert a JSON result into a Python dict. This method can be overwritten in a subclass
-        for a different conversion method.
-
-        :return: converted result.
-        :rtype: dict
-        """
-        return json.loads(self.response.read().decode("utf-8"))
-
-    def _convertXML(self):
-        """
-        Convert an XML result into a Python dom tree. This method can be overwritten in a
-        subclass for a different conversion method.
-
-        :return: converted result.
-        :rtype: :class:`xml.dom.minidom.Document`
-        """
-        from xml.dom.minidom import parse
-        return parse(self.response)
-
-    def _convertRDF(self):
-        """
-        Convert a RDF/XML result into an RDFLib Graph. This method can be overwritten
-        in a subclass for a different conversion method.
-
-        :return: converted result.
-        :rtype: :class:`rdflib.graph.Graph`
-        """
-        try:
-            from rdflib.graph import ConjunctiveGraph
-        except ImportError:
-            from rdflib import ConjunctiveGraph
-        retval = ConjunctiveGraph()
-        # (DEPRECATED) this is a strange hack. If the publicID is not set, rdflib (or the underlying xml parser) makes a funny
-        # (DEPRECATED) (and, as far as I could see, meaningless) error message...
-        retval.load(self.response)  # (DEPRECATED) publicID=' ')
-        return retval
-
-    def _convertN3(self):
-        """
-        Convert a RDF Turtle/N3 result into a string. This method can be overwritten in a subclass
-        for a different conversion method.
-
-        :return: converted result.
-        :rtype: string
-        """
-        return self.response.read()
-
-    def _convertCSV(self):
-        """
-        Convert a CSV result into a string. This method can be overwritten in a subclass
-        for a different conversion method.
-
-        :return: converted result.
-        :rtype: string
-        """
-        return self.response.read()
-
-    def _convertTSV(self):
-        """
-        Convert a TSV result into a string. This method can be overwritten in a subclass
-        for a different conversion method.
-
-        :return: converted result.
-        :rtype: string
-        """
-        return self.response.read()
-
-    def _convertJSONLD(self):
-        """
-        Convert a RDF JSON-LD result into an RDFLib Graph. This method can be overwritten
-        in a subclass for a different conversion method.
-
-        :return: converted result
-        :rtype: :class:`rdflib.graph.Graph`
-        """
-        from rdflib import ConjunctiveGraph
-        retval = ConjunctiveGraph()
-        retval.load(self.response, format='json-ld')  # (DEPRECATED), publicID=' ')
-        return retval
-
-    def convert(self):
-        """
-        Encode the return value depending on the return format:
-
-            * in the case of :data:`XML`, a DOM top element is returned
-            * in the case of :data:`JSON`, a json conversion will return a dictionary
-            * in the case of :data:`RDF/XML<RDFXML>`, the value is converted via RDFLib into a ``RDFLib Graph`` instance
-            * in the case of :data:`JSON-LD<JSONLD>`, the value is converted via RDFLib into a ``RDFLib Graph`` instance
-            * in the case of RDF :data:`Turtle<TURTLE>`/:data:`N3`, a string is returned
-            * in the case of :data:`CSV`/:data:`TSV`, a string is returned
-            * In all other cases the input simply returned.
-
-        :return: the converted query result. See the conversion methods for more details.
-        """
-
-        def _content_type_in_list(real, expected):
-            """ Internal method for checking if the content-type header received matches any of the content types of the expected list.
-
-            :param real: The content-type header received.
-            :type real: string
-            :param expected: A list of expected content types.
-            :type expected: list
-            :return: Returns a boolean after checking if the content-type header received matches any of the content types of the expected list.
-            :rtype: boolean
-            """
-            return True in [real.find(mime) != -1 for mime in expected]
-
-        def _validate_format(format_name, allowed, mime, requested):
-            """ Internal method for validating if the requested format is one of the allowed formats.
-
-            :param format_name: The format name (to be used in the warning message).
-            :type format_name: string
-            :param allowed: A list of allowed content types.
-            :type allowed: list
-            :param mime: The content-type header received (to be used in the warning message).
-            :type mime: string
-            :param requested: the requested format.
-            :type requested: string
-            """
-            if requested not in allowed:
-                message = "Format requested was %s, but %s (%s) has been returned by the endpoint"
-                warnings.warn(message % (requested.upper(), format_name, mime), RuntimeWarning)
-
-        # TODO. In order to compare properly, the requested QueryType (SPARQL Query Form) is needed. For instance, the unexpected N3 requested for a SELECT would return XML
-        if "content-type" in self.info():
-            ct = self.info()["content-type"]  # returned Content-Type value
-
-            if _content_type_in_list(ct, _SPARQL_XML):
-                _validate_format("XML", [XML], ct, self.requestedFormat)
-                return self._convertXML()
-            elif _content_type_in_list(ct, _XML):
-                _validate_format("XML", [XML], ct, self.requestedFormat)
-                return self._convertXML()
-            elif _content_type_in_list(ct, _SPARQL_JSON):
-                _validate_format("JSON", [JSON], ct, self.requestedFormat)
-                return self._convertJSON()
-            elif _content_type_in_list(ct, _RDF_XML):
-                _validate_format("RDF/XML", [RDF, XML, RDFXML], ct, self.requestedFormat)
-                return self._convertRDF()
-            elif _content_type_in_list(ct, _RDF_N3):
-                _validate_format("N3", [N3, TURTLE], ct, self.requestedFormat)
-                return self._convertN3()
-            elif _content_type_in_list(ct, _CSV):
-                _validate_format("CSV", [CSV], ct, self.requestedFormat)
-                return self._convertCSV()
-            elif _content_type_in_list(ct, _TSV):
-                _validate_format("TSV", [TSV], ct, self.requestedFormat)
-                return self._convertTSV()
-            elif _content_type_in_list(ct, _RDF_JSONLD):
-                _validate_format("JSON(-LD)", [JSONLD, JSON], ct, self.requestedFormat)
-                return self._convertJSONLD()
-            else:
-                warnings.warn("unknown response content type '%s' returning raw response..." %(ct), RuntimeWarning)
-        return self.response.read()
-
-    def _get_responseFormat(self):
-        """
-        Get the response (return) format. The possible values are: :data:`JSON`, :data:`XML`, :data:`RDFXML`, :data:`TURTLE`, :data:`N3`, :data:`CSV`, :data:`TSV`, :data:`JSONLD`.
-        In case there is no Content-Type, ``None`` is return. In all other cases, the raw Content-Type is return.
-
-        .. versionadded:: 1.8.3
-
-        :return: the response format. The possible values are: :data:`JSON`, :data:`XML`, :data:`RDFXML`, :data:`TURTLE`, :data:`N3`, :data:`CSV`, :data:`TSV`, :data:`JSONLD`.
-        :rtype: string
-        """
-
-        def _content_type_in_list(real, expected):
-            """ Internal method for checking if the content-type header received matches any of the content types of the expected list.
-
-            :param real: The content-type header received.
-            :type real: string
-            :param expected: A list of expected content types.
-            :type expected: list
-            :return: Returns a boolean after checking if the content-type header received matches any of the content types of the expected list.
-            :rtype: boolean
-            """
-            return True in [real.find(mime) != -1 for mime in expected]
-
-        if "content-type" in self.info():
-            ct = self.info()["content-type"]  # returned Content-Type value
-
-            if _content_type_in_list(ct, _SPARQL_XML):
-                return XML
-            elif _content_type_in_list(ct, _XML):
-                return XML
-            elif _content_type_in_list(ct, _SPARQL_JSON):
-                return JSON
-            elif _content_type_in_list(ct, _RDF_XML):
-                return RDFXML
-            elif _content_type_in_list(ct, _RDF_TURTLE):
-                return TURTLE
-            elif _content_type_in_list(ct, _RDF_N3):
-                return N3
-            elif _content_type_in_list(ct, _CSV):
-                return CSV
-            elif _content_type_in_list(ct, _TSV):
-                return TSV
-            elif _content_type_in_list(ct, _RDF_JSONLD):
-                return JSONLD
-            else:
-                warnings.warn("Unknown response content type. Returning raw content-type ('%s')." %(ct), RuntimeWarning)
-                return ct
-        return None
-
-    def print_results(self, minWidth=None):
-        """This method prints a representation of a :class:`QueryResult` object that MUST has as response format :data:`JSON`.
-
-        :param minWidth: The minimum width, counting as characters. The default value is ``None``.
-        :type minWidth: string
-        """
-
-        # Check if the requested format was JSON. If not, exit.
-        responseFormat = self._get_responseFormat()
-        if responseFormat != JSON:
-            message = "Format return was %s, but JSON was expected. No printing."
-            warnings.warn(message % (responseFormat), RuntimeWarning)
-            return
-
-        results = self._convertJSON()
-        if minWidth:
-            width = self.__get_results_width(results, minWidth)
-        else:
-            width = self.__get_results_width(results)
-        index = 0
-        for var in results["head"]["vars"]:
-            print(("?" + var).ljust(width[index]), "|",)
-            index += 1
-        print()
-        print("=" * (sum(width) + 3 * len(width)))
-        for result in results["results"]["bindings"]:
-            index = 0
-            for var in results["head"]["vars"]:
-                result_value = self.__get_prettyprint_string_sparql_var_result(result[var])
-                print(result_value.ljust(width[index]), "|",)
-                index += 1
-            print()
-
-    def __get_results_width(self, results, minWidth=2):
-        width = []
-        for var in results["head"]["vars"]:
-            width.append(max(minWidth, len(var) + 1))
-        for result in results["results"]["bindings"]:
-            index = 0
-            for var in results["head"]["vars"]:
-                result_value = self.__get_prettyprint_string_sparql_var_result(result[var])
-                width[index] = max(width[index], len(result_value))
-                index += 1
-        return width
-
-    def __get_prettyprint_string_sparql_var_result(self, result):
-        value = result["value"]
-        lang = result.get("xml:lang", None)
-        datatype = result.get("datatype", None)
-        if lang is not None:
-            value += "@" + lang
-        if datatype is not None:
-            value += " [" + datatype + "]"
-        return value
-
-    def __str__(self):
-        """This method returns the string representation of a :class:`QueryResult` object.
-
-        :return: A human-readable string of the object.
-        :rtype: string
-        .. versionadded:: 1.8.3
-        """
-        fullname = self.__module__ + "." + self.__class__.__name__
-        str_requestedFormat = '"requestedFormat" : ' + repr(self.requestedFormat)
-        str_url = self.response.url
-        str_code = self.response.code
-        str_headers = self.response.info()
-        str_response = '"response (a file-like object, as return by the urllib2.urlopen library call)" : {\n\t"url" : "%s",\n\t"code" : "%s",\n\t"headers" : %s}' % (str_url, str_code, str_headers)
-        return "<%s object at 0x%016X>\n{%s,\n%s}" % (fullname, id(self), str_requestedFormat, str_response)
+    def getRRequestedFormat(self):
+        return self.requestedFormat
