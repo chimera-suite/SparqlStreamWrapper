@@ -806,7 +806,7 @@ class SPARQLStreamWrapper(object):
             :return: query result
             :rtype: :class:`QueryResult` instance
         """
-        for res in self._query():
+        for res in self._query(skipHeader):
             yield QueryResult(res)
         #return self._query(skipHeader)
     
