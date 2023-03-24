@@ -31,7 +31,7 @@ with open('requirements.txt', 'r') as f:
 setup(
     name='SPARQLStreamWrapper',
     version=version,
-    description='SPARQL Streaming Endpoint interface to Python',
+    description='SPARQL Endpoint interface to permit streaming queries from Python',
     long_description='This is a wrapper around a SPARQL service and supports RSP-QL queries. It helps in creating the query URI and, possibly, convert the result into a more manageable format.',
     license='W3C SOFTWARE NOTICE AND LICENSE',
     author=authors,
@@ -39,7 +39,7 @@ setup(
     download_url='https://github.com/RDFLib/sparqlwrapper/releases',
     platforms=['any'],
     python_requires='>=3.5',
-    packages=['SPARQLWrapper'],
+    packages=['SPARQLStreamWrapper'],
     install_requires=_install_requires,
     extras_require={
         'keepalive': ['keepalive>=0.5'],
