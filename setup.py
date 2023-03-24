@@ -10,7 +10,7 @@ _version_re = re.compile(r'__version__\s*=\s*"(.*)"')
 _authors_re = re.compile(r'__authors__\s*=\s*"(.*)"')
 _url_re = re.compile(r'__url__\s*=\s*"(.*)"')
 
-for line in open('SPARQLWrapper/__init__.py'):
+for line in open('SPARQLStreamWrapper/__init__.py'):
 
     version_match = _version_re.match(line)
     if version_match:
@@ -29,10 +29,10 @@ with open('requirements.txt', 'r') as f:
     _install_requires = [line.rstrip('\n') for line in f]
 
 setup(
-    name='SPARQLWrapper',
+    name='SPARQLStreamWrapper',
     version=version,
-    description='SPARQL Endpoint interface to Python',
-    long_description='This is a wrapper around a SPARQL service. It helps in creating the query URI and, possibly, convert the result into a more manageable format.',
+    description='SPARQL Streaming Endpoint interface to Python',
+    long_description='This is a wrapper around a SPARQL service and supports RSP-QL queries. It helps in creating the query URI and, possibly, convert the result into a more manageable format.',
     license='W3C SOFTWARE NOTICE AND LICENSE',
     author=authors,
     url=url,
